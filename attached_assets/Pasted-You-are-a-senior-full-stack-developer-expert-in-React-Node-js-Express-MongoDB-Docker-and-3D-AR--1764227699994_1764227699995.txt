@@ -1,0 +1,70 @@
+You are a senior full-stack developer expert in React, Node.js, Express, MongoDB, Docker, and 3D/AR tech.
+
+Build a complete, production-ready full-stack app with these features:
+
+---
+
+# Project Overview
+
+1. Two user types: Regular Users and Admin.
+
+2. Regular Users:
+- Upload 3D models (OBJ, FBX, GLB, STL).
+- Select device type (iOS → USDZ, Android/Other → GLB, or Both).
+- Backend converts uploaded model accordingly.
+- AR viewer with <model-viewer> for users (Quick Look for iOS, WebXR for Android).
+- Temporary uploads auto-deleted on reload/close/new upload.
+- Can browse Admin-uploaded models (visible ones) and view in AR.
+
+3. Admin Users:
+- Full dashboard with CRUD for 3D models + assets.
+- Upload default GLB model, textures, materials, color variations.
+- Store configurator metadata: parts, textures, colors.
+- Toggle model visibility.
+- Manage uploaded files and metadata.
+- Metadata structure example:
+  {
+    parts: ["body", "wheels", "interior"],
+    textures: { leather: ["black", "brown"], metal: ["silver", "gold"] },
+    colors: ["#ffffff", "#000000", "#ff0000"]
+  }
+
+4. Future-ready configurator:
+- Material swapping
+- Color changing
+- Part toggling
+- Save user configurations
+- Export configured model to AR
+
+---
+
+# Tech Stack
+
+- Frontend: React + Vite + Zustand (or Redux), Three.js ready, responsive UI, admin dashboard, AR viewer.
+- Backend: Node.js + Express, file upload, device-based conversion (fbx2gltf, gltf-transform, gltf-to-usdz), authentication with JWT, temp and permanent storage, admin CRUD APIs.
+- Database: MongoDB with schemas for AdminModels, ConfiguratorMetadata, etc.
+- Storage: /tmp for temp uploads, /public/admin-models, /public/admin-textures, /public/admin-config.
+- Dockerized backend and frontend, with full dev and production setup instructions.
+
+---
+
+# Requirements for your output
+
+1. Provide full folder structure (frontend + backend).
+2. Provide backend code: Express server, API routes, file upload + conversion, admin CRUD, auth, temp file handling.
+3. Provide MongoDB schemas/models.
+4. Provide frontend code: upload UI, device selection, AR viewer, admin dashboard, configurator components, state management.
+5. Provide Dockerfiles and docker-compose for easy local and production deployment.
+6. Provide README with setup and run instructions.
+7. Write clean, modular, production-quality code with comments.
+8. Deliver the project **step-by-step**, starting from backend setup, then frontend, then integrations.
+
+---
+
+Start by generating the **full folder structure and the backend server.js** with upload API scaffold and MongoDB connection.
+
+Wait for my confirmation before proceeding to frontend.
+
+---
+
+Keep replies concise, only code or structure unless I ask for explanation.

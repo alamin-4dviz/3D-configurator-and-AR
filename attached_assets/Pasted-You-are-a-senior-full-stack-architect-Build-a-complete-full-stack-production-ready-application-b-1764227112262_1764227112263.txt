@@ -1,0 +1,173 @@
+You are a senior full-stack architect.  
+Build a complete full-stack production-ready application based on the following detailed requirements.
+
+====================================================
+🔶 PROJECT OVERVIEW
+====================================================
+This system has two user types:
+1. Regular Users
+2. Admin
+
+The system supports uploading 3D models, auto-conversion, AR viewing, configurator features, 
+admin model management, CRUD operations, and temporary file handling.
+
+====================================================
+🔶 USER FLOW (Regular User)
+====================================================
+1. User uploads a 3D model file (OBJ, FBX, GLB, STL).
+2. Before upload, user selects their device type:
+      • iOS  
+      • Android / Others
+   This determines which format(s) the backend should convert:
+      • iOS → USDZ only
+      • Android/Others → GLB only
+      • Optional: Both formats if user selects “Both”
+3. Backend receives file → converts based on device type.
+4. After conversion, user can view the model in AR:
+      • iOS → Quick Look (USDZ)
+      • Android → WebXR (GLB)
+5. When user:
+      • Reloads page  
+      • Leaves page  
+      • Uploads a new model  
+      → The previous converted files are auto-deleted from the server.
+6. Users can also view admin-uploaded models (public list), with AR view + future configurator support.
+
+====================================================
+🔶 ADMIN FLOW
+====================================================
+Admin has a full dashboard where they can:
+1. Upload 3D models with all configurator-related assets:
+      • Default GLB model
+      • Textures / Materials / Color variations
+      • Any additional metadata needed for future configurator
+2. Each admin model has:
+      • Visibility (show/hide toggle)
+      • Title, description, categories
+      • List of configurable parts
+      • Texture packs
+      • Material options
+3. Admin can manage their models with full CRUD:
+      • Create model
+      • Upload assets
+      • Edit metadata
+      • Update texture packs
+      • Hide/Show visibility
+      • Delete model
+4. Admin dashboard must include:
+      • Model list table
+      • Upload/edit screen
+      • Toggle visibility
+      • Delete button
+
+====================================================
+🔶 USER VIEW OF ADMIN MODELS
+====================================================
+Users will see an extra header menu item:
+"Admin Models"
+
+There they can browse:
+• All admin-uploaded models that are set to “visible”
+• View them in the future 3D configurator
+• Then view the configured version in AR (GLB for Android, USDZ for iOS)
+
+====================================================
+🔶 FUTURE-PROOF CONFIGURATOR SYSTEM
+====================================================
+The project must be structured so that later we can implement:
+• Material swapping
+• Color changing
+• Texture changing
+• Part toggling (ex: wheels type, interior type, etc.)
+• Environment lighting changes
+• Saving user configuration
+• AR export of configured model
+
+Backend must store configurator metadata like:
+
+{
+  "parts": ["body", "wheels", "interior"],
+  "textures": {
+      "leather": ["black", "brown", "red"],
+      "metal": ["silver", "gold"]
+  },
+  "colors": ["#ffffff", "#000000", "#ff0000"]
+}
+
+====================================================
+🔶 TECH REQUIREMENTS
+====================================================
+Frontend:
+- React + Vite
+- UI state: Zustand or Redux
+- AR viewer: <model-viewer> (initial)
+- Three.js architecture prepared (for configurator)
+- Responsive UI
+- Admin dashboard pages
+
+Backend:
+- Node.js + Express
+- Upload API
+- Device-based conversion logic:
+      iOS → USDZ converter  
+      Android → GLB converter  
+- Temp folder for user uploads
+- Permanent folder for admin uploads
+- Admin model metadata system
+- CRUD routes for admin models
+- Auto-delete temporary files:
+      • on frontend beforeunload event  
+      • backend scheduled cleanup safety
+- Authentication for admin (simple JWT or session)
+
+Conversion Tools:
+- fbx2gltf (FBX → GLB)
+- gltf-transform (optimize GLB)
+- gltf-to-usdz or usdzconverter (GLB → USDZ)
+
+Storage:
+- /tmp for temporary models
+- /public/admin-models for permanent admin models
+- /public/admin-textures for textures
+- /public/admin-config for metadata
+
+Database:
+- MongoDB or PostgreSQL (choose one)
+Tables/Collections:
+  • AdminModels
+  • ModelParts
+  • ModelTextures
+  • ModelVisibility
+  • ConfiguratorMetadata
+
+Docker:
+- Backend must include a working Dockerfile
+- Instructions for running locally + production
+
+====================================================
+🔶 WHAT TO GENERATE
+====================================================
+Generate the entire project:
+
+1. Full folder structure (frontend + backend).
+2. Full frontend code:
+      • Upload UI with device selection
+      • AR viewer page
+      • Admin models browser page
+      • Admin dashboard pages (CRUD)
+      • Three.js-ready configurator folder architecture
+3. Full backend code:
+      • Upload API (with device logic)
+      • Conversion scripts GLB & USDZ
+      • Temp file delete routes
+      • Admin CRUD routes
+      • Visibility toggle
+      • Metadata structure for future configurator
+      • AR output routes
+4. Database schema or models
+5. Dockerfile
+6. Dev + Prod setup instructions
+7. Write clean, modular code
+
+====================================================
+Start building the complete production-ready project step-by-step.
