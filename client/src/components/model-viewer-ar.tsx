@@ -127,6 +127,13 @@ export function ModelViewerAR({
     }
   };
 
+  const handleResetFullscreen = () => {
+    if (fullscreenViewerRef.current) {
+      (fullscreenViewerRef.current as any).cameraOrbit = "0deg 75deg 105%";
+      (fullscreenViewerRef.current as any).fieldOfView = "auto";
+    }
+  };
+
   const handleZoom = () => {
     setIsFullscreen(true);
   };
@@ -257,7 +264,7 @@ export function ModelViewerAR({
           }}
         />
         
-        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
+        <div className="absolute bottom-0 left-0 right-0 p-2 md:p-4 bg-gradient-to-t from-black/60 to-transparent">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button
@@ -268,7 +275,7 @@ export function ModelViewerAR({
                 title="Reset view to default camera position"
                 data-testid="button-reset-view"
               >
-                <RotateCcw className="h-4 w-4" />
+                <RotateCcw className="h-3 w-3" />
               </Button>
               <Button
                 variant="outline"
@@ -278,19 +285,19 @@ export function ModelViewerAR({
                 title="Expand to fullscreen"
                 data-testid="button-zoom"
               >
-                <Maximize2 className="h-4 w-4" />
+                <Maximize2 className="h-3 w-3" />
               </Button>
               {/* Info / tips removed to restore previous UX state */}
             </div>
             
             {canViewAR() && (
               <Button
-                className="min-h-12 px-6 gap-2 bg-primary hover:bg-primary/90 shadow-lg"
+                className="px-4 gap-2 bg-primary hover:bg-primary/90 shadow-lg"
                 data-testid="button-view-ar"
                 onClick={handleViewAR}
               >
-                <View className="h-5 w-5" />
-                <span className="font-semibold">View in AR</span>
+                <View className="h-4 w-4" />
+                <span className="font-semibold text-xs md:text-sm">View in AR</span>
                 <Smartphone className="h-4 w-4 ml-1" />
               </Button>
             )}
@@ -334,7 +341,7 @@ export function ModelViewerAR({
         <div className="fixed inset-0 z-50 bg-black flex flex-col">
           {/* Fullscreen Header */}
           <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between">
-            <div className="text-white max-w-xs">
+            <div className="text-white max-w-[15rem] sm:max-w-sm">
               <h3 className="font-semibold text-sm truncate">{title}</h3>
               <p className="text-xs text-gray-300">Fullscreen Preview</p>
             </div>
@@ -381,7 +388,7 @@ export function ModelViewerAR({
             <Button
               variant="outline"
               size="sm"
-              onClick={handleReset}
+              onClick={handleResetFullscreen}
               className="bg-white/20 hover:bg-white/30 text-white border-white/40 backdrop-blur-sm"
               title="Reset camera position"
             >
