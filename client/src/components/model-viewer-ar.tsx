@@ -250,27 +250,65 @@ export function ModelViewerAR({
           return;
         }
         
-        // Try to find and click the native AR button
-        const arButton = viewerRef.current?.shadowRoot?.querySelector(
-          'button[slot="ar-button"]'
-        ) as HTMLButtonElement;
+        const viewer = viewerRef.current as any;
         
+        // Log debug info
+        console.log("AR Debug Info:", {
+          glbPath,
+          usdzPath,
+          deviceType,
+          isIOS: isIOS(),
+          viewerElement: !!viewer,
+          hasShadowRoot: !!viewer?.shadowRoot,
+        });
+        
+        // Try multiple approaches to trigger AR
+        let arTriggered = false;
+        
+        // Approach 1: Look for AR button in shadow DOM
+        const arButton = viewer?.shadowRoot?.querySelector('button[slot="ar-button"]') as HTMLButtonElement;
         if (arButton) {
-          console.log("Triggering AR mode with:", { glbPath, usdzPath, deviceType });
-          // Add a small delay to ensure model is fully loaded
-          await new Promise(resolve => setTimeout(resolve, 200));
+          console.log("Found AR button, clicking it");
           arButton.click();
-        } else {
-          // If AR button not found, try alternative approach or show helpful message
+          arTriggered = true;
+        }
+        
+        // Approach 2: Try the activateAR() method if available
+        if (!arTriggered && typeof viewer?.activateAR === "function") {
+          console.log("Calling activateAR() method");
+          await viewer.activateAR();
+          arTriggered = true;
+        }
+        
+        // Approach 3: Try calling model-viewer's AR API directly
+        if (!arTriggered && viewer?.ar) {
+          console.log("Using model-viewer AR API");
+          if (typeof viewer.ar.launch === "function") {
+            viewer.ar.launch();
+            arTriggered = true;
+          }
+        }
+        
+        if (!arTriggered) {
+          // If nothing worked, provide detailed diagnostic message
           const isIOS_Device = isIOS();
           const hasModel = glbPath || usdzPath;
+          const browserInfo = navigator.userAgent;
+          
+          console.error("AR trigger failed", {
+            isIOS: isIOS_Device,
+            hasModel,
+            glbPath,
+            usdzPath,
+            browser: browserInfo,
+          });
           
           if (!hasModel) {
             setError("No 3D model loaded. Please upload a model first.");
-          } else if (isIOS_Device && !usdzPath) {
-            setError("iOS Quick Look requires USDZ format. Try uploading a GLB file.");
+          } else if (isIOS_Device) {
+            setError("iOS AR not supported in this browser. Try Safari or a device with ARKit support.");
           } else {
-            setError("AR mode is not available on this device or browser. Try updating your browser or using a different device.");
+            setError("AR mode requires a device with WebXR or ARCore support. Try a mobile device with these features enabled.");
           }
         }
       }
