@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { View, RotateCcw, ZoomIn, Smartphone, RefreshCw, X } from "lucide-react";
+import { View, RotateCcw, ZoomIn, Smartphone, RefreshCw, X, Info, Hand, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DeviceType } from "@shared/schema";
 
@@ -50,6 +50,7 @@ export function ModelViewerAR({
   const [error, setError] = useState<string | null>(null);
   const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [showARHints, setShowARHints] = useState(true);
   const viewerRef = useRef<HTMLElement | null>(null);
   const fullscreenViewerRef = useRef<HTMLElement | null>(null);
 
@@ -383,7 +384,8 @@ export function ModelViewerAR({
                 variant="outline"
                 size="icon"
                 onClick={handleReset}
-                className="bg-background/80 backdrop-blur-sm"
+                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                title="Reset view to default camera position"
                 data-testid="button-reset-view"
               >
                 <RotateCcw className="h-4 w-4" />
@@ -392,16 +394,26 @@ export function ModelViewerAR({
                 variant="outline"
                 size="icon"
                 onClick={handleZoom}
-                className="bg-background/80 backdrop-blur-sm"
+                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                title="Expand to fullscreen"
                 data-testid="button-zoom"
               >
-                <ZoomIn className="h-4 w-4" />
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={() => setShowARHints(!showARHints)}
+                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                title={showARHints ? "Hide tips" : "Show tips"}
+              >
+                <Info className="h-4 w-4" />
               </Button>
             </div>
             
             {canViewAR() && (
               <Button
-                className="min-h-12 px-6 gap-2 bg-primary hover:bg-primary/90"
+                className="min-h-12 px-6 gap-2 bg-primary hover:bg-primary/90 shadow-lg"
                 data-testid="button-view-ar"
                 onClick={handleViewAR}
                 disabled={isRequestingPermission}
@@ -421,6 +433,24 @@ export function ModelViewerAR({
               </Button>
             )}
           </div>
+
+          {/* AR Tips/Hints Overlay */}
+          {showARHints && !error && (
+            <div className="mt-4 p-3 bg-black/80 rounded-lg backdrop-blur-sm border border-white/20 text-white text-sm animate-in fade-in">
+              <div className="space-y-2">
+                <div className="flex items-center gap-2 font-semibold">
+                  <Hand className="h-4 w-4 text-primary" />
+                  How to use:
+                </div>
+                <ul className="text-xs text-gray-300 space-y-1 pl-6 list-disc">
+                  <li><span className="text-primary font-medium">Drag</span> to rotate the model</li>
+                  <li><span className="text-primary font-medium">Pinch</span> to zoom in/out</li>
+                  <li><span className="text-primary font-medium">Tap</span> "View in AR" to place in your space</li>
+                  <li>Move your device to see the model from all angles</li>
+                </ul>
+              </div>
+            </div>
+          )}
         </div>
       </div>
       
@@ -457,18 +487,26 @@ export function ModelViewerAR({
       )}
 
       {isFullscreen && (
-        <div className="fixed inset-0 z-50 bg-black">
-          <Button
-            onClick={handleCloseFullscreen}
-            variant="ghost"
-            size="icon"
-            className="fixed top-7 -right-7 z-50 bg-white hover:bg-gray-200 text-black rounded-full shadow-lg p-2"
-            data-testid="button-close-fullscreen"
-          >
-            <X className="h-6 w-6" />
-          </Button>
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          {/* Fullscreen Header */}
+          <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between">
+            <div className="text-white max-w-xs">
+              <h3 className="font-semibold text-sm truncate">{title}</h3>
+              <p className="text-xs text-gray-300">Fullscreen Preview</p>
+            </div>
+            <Button
+              onClick={handleCloseFullscreen}
+              variant="ghost"
+              size="icon"
+              className="bg-white hover:bg-gray-200 text-black rounded-full shadow-lg p-2"
+              data-testid="button-close-fullscreen"
+              title="Close fullscreen"
+            >
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
 
-          <div className="w-full h-full relative">
+          <div className="w-full h-full flex-1 relative">
             <model-viewer
               ref={fullscreenViewerRef as any}
               src={glbPath || undefined}
@@ -492,6 +530,31 @@ export function ModelViewerAR({
                 syncFullscreenViewer();
               }}
             />
+          </div>
+
+          {/* Fullscreen Controls Footer */}
+          <div className="absolute bottom-0 left-0 right-0 z-10 p-4 bg-gradient-to-t from-black/80 to-transparent flex justify-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleReset}
+              className="bg-white/20 hover:bg-white/30 text-white border-white/40 backdrop-blur-sm"
+              title="Reset camera position"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleViewAR}
+              disabled={isRequestingPermission}
+              className="bg-primary hover:bg-primary/90 text-white border-0 backdrop-blur-sm"
+              title="View this model in AR"
+            >
+              <View className="h-4 w-4 mr-2" />
+              View in AR
+            </Button>
           </div>
         </div>
       )}
