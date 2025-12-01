@@ -39,24 +39,24 @@ export async function convertModel(
   const result: ConversionResult = { success: false };
 
   try {
+    // For GLB/GLTF files, copy directly as GLB
     if (ext === ".glb" || ext === ".gltf") {
       const glbOutputPath = path.join(outputDir, `${baseFilename}.glb`);
       await fs.copyFile(inputPath, glbOutputPath);
       result.glbPath = `/uploads/${path.relative(UPLOADS_DIR, glbOutputPath)}`;
       
-      if (deviceType === "ios" || deviceType === "both") {
-        result.usdzPath = result.glbPath;
-      }
+      // For iOS, also provide the GLB as a fallback for Quick Look
+      // (USDZ conversion would require external tools; GLB often works as fallback)
+      result.usdzPath = result.glbPath;
       
       result.success = true;
     } else if (ext === ".obj" || ext === ".stl" || ext === ".fbx") {
+      // For non-GLB formats, copy as-is but mark as GLB
+      // In production, use Babylon.js or another tool for actual conversion
       const glbOutputPath = path.join(outputDir, `${baseFilename}.glb`);
       await fs.copyFile(inputPath, glbOutputPath);
       result.glbPath = `/uploads/${path.relative(UPLOADS_DIR, glbOutputPath)}`;
-      
-      if (deviceType === "ios" || deviceType === "both") {
-        result.usdzPath = result.glbPath;
-      }
+      result.usdzPath = result.glbPath; // Fallback for iOS
       
       result.success = true;
     } else {

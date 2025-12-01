@@ -153,13 +153,18 @@ export function ModelViewerAR({
   };
 
   const canViewAR = () => {
-    if (deviceType === "ios" || deviceType === "both") {
-      if (isIOS() && usdzPath) return true;
+    // If we have GLB, AR should generally be available
+    if (glbPath) {
+      return true;
     }
-    if (deviceType === "android" || deviceType === "both") {
-      if (!isIOS() && glbPath) return true;
+    
+    // If iOS and we have USDZ, AR is available
+    if (isIOS() && usdzPath) {
+      return true;
     }
-    return Boolean(glbPath);
+    
+    // Fallback: if we have any path, allow AR (let model-viewer handle it)
+    return Boolean(usdzPath);
   };
 
   const requestCameraPermission = async (): Promise<boolean> => {
@@ -239,16 +244,34 @@ export function ModelViewerAR({
         // Wait a brief moment for permission to be fully processed
         await new Promise(resolve => setTimeout(resolve, 300));
         
-        // Click the native AR button after permission is granted
+        // Check if model-viewer element is properly loaded
+        if (!viewerRef.current) {
+          setError("3D viewer not loaded. Please refresh and try again.");
+          return;
+        }
+        
+        // Try to find and click the native AR button
         const arButton = viewerRef.current?.shadowRoot?.querySelector(
           'button[slot="ar-button"]'
         ) as HTMLButtonElement;
         
         if (arButton) {
-          console.log("Triggering AR mode");
+          console.log("Triggering AR mode with:", { glbPath, usdzPath, deviceType });
+          // Add a small delay to ensure model is fully loaded
+          await new Promise(resolve => setTimeout(resolve, 200));
           arButton.click();
         } else {
-          setError("AR mode is not available for this model or device.");
+          // If AR button not found, try alternative approach or show helpful message
+          const isIOS_Device = isIOS();
+          const hasModel = glbPath || usdzPath;
+          
+          if (!hasModel) {
+            setError("No 3D model loaded. Please upload a model first.");
+          } else if (isIOS_Device && !usdzPath) {
+            setError("iOS Quick Look requires USDZ format. Try uploading a GLB file.");
+          } else {
+            setError("AR mode is not available on this device or browser. Try updating your browser or using a different device.");
+          }
         }
       }
     } catch (err) {
