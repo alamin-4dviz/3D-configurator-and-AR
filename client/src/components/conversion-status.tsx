@@ -42,7 +42,7 @@ export function ConversionStatus({ status, className }: ConversionStatusProps) {
   return (
     <div
       className={cn(
-        "flex items-center gap-3 p-4 rounded-lg",
+        "flex items-center justify-between gap-1 sm:gap-2 px-3 sm:px-4 py-2 rounded-lg",
         config.bgColor,
         className
       )}
@@ -50,7 +50,7 @@ export function ConversionStatus({ status, className }: ConversionStatusProps) {
     >
       <div
         className={cn(
-          "h-10 w-10 rounded-full flex items-center justify-center",
+          "h-6 w-6 rounded-full flex items-center justify-center",
           config.bgColor
         )}
       >
@@ -63,17 +63,12 @@ export function ConversionStatus({ status, className }: ConversionStatusProps) {
         />
       </div>
       <div>
-        <p className={cn("font-medium", config.color)} data-testid="text-status-label">
+        <p className={cn("font-medium text-xs sm:text-sm", config.color)} data-testid="text-status-label">
           {config.label}
         </p>
         {status === "converting" && (
           <p className="text-sm text-muted-foreground">
             This may take a few moments...
-          </p>
-        )}
-        {status === "ready" && (
-          <p className="text-sm text-muted-foreground">
-            Your model is ready to view in AR
           </p>
         )}
       </div>

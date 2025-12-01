@@ -128,19 +128,15 @@ export default function Home() {
     <div className="min-h-[calc(100vh-4rem)]">
       <div className="container mx-auto px-4 py-12">
         <div className="max-w-3xl mx-auto">
-          <div className="text-center mb-12">
+          <div className="text-center mb-6">
             <div className="inline-flex items-center gap-2 px-4 py-2 rounded-full bg-primary/10 text-primary text-sm font-medium mb-6">
               <Sparkles className="h-4 w-4" />
               Instant 3D to AR Conversion
             </div>
-            <h1 className="text-4xl md:text-5xl font-bold mb-4">
+            <h1 className="text-3xl md:text-5xl font-bold mb-4">
               View Your 3D Models in{" "}
               <span className="text-primary">Augmented Reality</span>
             </h1>
-            <p className="text-lg text-muted-foreground max-w-2xl mx-auto">
-              Upload any 3D model and instantly view it in AR on your device.
-              Supports OBJ, FBX, GLB, and STL formats.
-            </p>
           </div>
 
           {status === "ready" && (glbPath || usdzPath) ? (
@@ -153,7 +149,7 @@ export default function Home() {
               />
               <div className="flex items-center justify-between">
                 <ConversionStatus status={status} />
-                <Button onClick={handleNewUpload} variant="outline" className="gap-2">
+                <Button onClick={handleNewUpload} variant="outline" className="gap-2 px-2 text-xs md:text-base">
                   <Upload className="h-4 w-4" />
                   Upload New Model
                 </Button>
