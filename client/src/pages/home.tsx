@@ -1,7 +1,7 @@
 import { useState, useCallback, useEffect } from "react";
 import { useMutation } from "@tanstack/react-query";
 import { Upload, Sparkles, Box } from "lucide-react";
-import { DeviceSelector } from "@/components/device-selector";
+// Device selector removed: we auto-detect platform for conversion
 import { FileUploadZone } from "@/components/file-upload-zone";
 import { ModelViewerAR } from "@/components/model-viewer-ar";
 import { ConversionStatus } from "@/components/conversion-status";
@@ -107,6 +107,23 @@ export default function Home() {
     };
   }, [sessionId]);
 
+  // Auto-detect device and set target platform for conversion
+  useEffect(() => {
+    try {
+      const ua = typeof navigator !== "undefined" ? navigator.userAgent || "" : "";
+      const isiOS = /iPad|iPhone|iPod/.test(ua) || (ua.includes('Mac') && 'ontouchend' in document);
+      if (isiOS) {
+        setDeviceType("ios");
+      } else {
+        setDeviceType("android");
+      }
+    } catch (e) {
+      // ignore detection errors and keep default
+    }
+    // run only once on mount
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
   return (
     <div className="min-h-[calc(100vh-4rem)]">
       <div className="container mx-auto px-4 py-12">
@@ -143,11 +160,16 @@ export default function Home() {
               </div>
             </div>
           ) : (
-            <div className="space-y-8">
-              <DeviceSelector
-                selectedDevice={deviceType}
-                onDeviceChange={setDeviceType}
-              />
+            <div className="space-y-6">
+              <div className="text-center">
+                <p className="text-sm text-muted-foreground">
+                  Target platform detected: 
+                  <span className="font-medium text-primary">{deviceType === 'ios' ? 'iOS (Quick Look / USDZ)' : 'Android & Others (WebXR / GLB)'}</span>
+                </p>
+                <p className="text-xs text-muted-foreground mt-1">
+                  We will automatically convert uploaded models to the optimal format for this device.
+                </p>
+              </div>
 
               <FileUploadZone
                 onFileSelect={handleFileSelect}
@@ -167,7 +189,7 @@ export default function Home() {
                     data-testid="button-start-conversion"
                   >
                     <Box className="h-5 w-5" />
-                    Convert & View in AR
+                    View
                   </Button>
                 </div>
               )}

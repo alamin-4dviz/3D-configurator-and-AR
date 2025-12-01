@@ -48,17 +48,20 @@ export async function registerRoutes(
   app.post("/api/auth/login", async (req: Request, res: Response) => {
     try {
       const { username, password } = req.body;
+      console.log('Login attempt:', { username, password: password ? '***' : 'missing' });
       
       if (!username || !password) {
         return res.status(400).json({ error: "Username and password are required" });
       }
       
       const user = await storage.getUserByUsername(username);
+      console.log('User found:', !!user);
       if (!user) {
         return res.status(401).json({ error: "Invalid credentials" });
       }
       
       const isValid = await verifyPassword(password, user.password);
+      console.log('Password valid:', isValid);
       if (!isValid) {
         return res.status(401).json({ error: "Invalid credentials" });
       }

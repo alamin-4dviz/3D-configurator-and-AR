@@ -62,14 +62,20 @@ export class MemStorage implements IStorage {
     if (this.initialized) return;
     this.initialized = true;
     
-    const hashedPassword = await bcrypt.hash("admin123", 10);
-    const adminUser: User = {
-      id: randomUUID(),
-      username: "admin",
-      password: hashedPassword,
-      isAdmin: true,
-    };
-    this.users.set(adminUser.id, adminUser);
+    try {
+      const hashedPassword = await bcrypt.hash("admin123", 10);
+      const adminUser: User = {
+        id: randomUUID(),
+        username: "admin",
+        password: hashedPassword,
+        isAdmin: true,
+      };
+      this.users.set(adminUser.id, adminUser);
+      console.log('Admin user initialized with password hash');
+    } catch (error) {
+      console.error('Error initializing admin user:', error);
+      throw error;
+    }
   }
 
   async getUser(id: string): Promise<User | undefined> {

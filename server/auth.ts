@@ -30,7 +30,14 @@ export function verifyToken(token: string): { id: string; username: string; isAd
 }
 
 export async function verifyPassword(password: string, hashedPassword: string): Promise<boolean> {
-  return bcrypt.compare(password, hashedPassword);
+  try {
+    const result = await bcrypt.compare(password, hashedPassword);
+    console.log('Password verification:', { password: '***', hashedPassword: hashedPassword.substring(0, 20) + '...', result });
+    return result;
+  } catch (error) {
+    console.error('Error verifying password:', error);
+    return false;
+  }
 }
 
 export function authMiddleware(req: AuthRequest, res: Response, next: NextFunction) {
