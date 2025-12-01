@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { View, RotateCcw, ZoomIn, Smartphone, RefreshCw, X, Info, Hand, Maximize2 } from "lucide-react";
+import { View, RotateCcw, Smartphone, RefreshCw, X, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DeviceType } from "@shared/schema";
 
@@ -48,9 +48,7 @@ export function ModelViewerAR({
 }: ModelViewerARProps) {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isRequestingPermission, setIsRequestingPermission] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [showARHints, setShowARHints] = useState(true);
   const viewerRef = useRef<HTMLElement | null>(null);
   const fullscreenViewerRef = useRef<HTMLElement | null>(null);
 
@@ -168,151 +166,33 @@ export function ModelViewerAR({
     return Boolean(usdzPath);
   };
 
-  const requestCameraPermission = async (): Promise<boolean> => {
-    try {
-      setIsRequestingPermission(true);
-      setError(null);
-      
-      // Check if the Permissions API is available
-      if (!navigator.permissions) {
-        console.warn("Permissions API not available, attempting direct camera access");
-        // Try direct access for browsers that don't support Permissions API
-        try {
-          const stream = await navigator.mediaDevices.getUserMedia({ 
-            video: { facingMode: "environment" } 
-          });
-          // Stop the stream immediately, we just needed permission
-          stream.getTracks().forEach(track => track.stop());
-          return true;
-        } catch (err) {
-          setError("Camera permission denied or not available on this device.");
-          return false;
-        }
-      }
-
-      // Request camera permission
-      const permission = await navigator.permissions.query({ name: "camera" });
-      
-      if (permission.state === "granted") {
-        console.log("Camera permission already granted");
-        return true;
-      }
-      
-      if (permission.state === "denied") {
-        setError("Camera permission denied. Please enable camera access in your browser settings to use AR mode.");
-        return false;
-      }
-      
-      // Permission state is "prompt", request it
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ 
-          video: { 
-            facingMode: "environment",
-            width: { ideal: 1280 },
-            height: { ideal: 720 }
-          } 
-        });
-        // Stop the stream immediately, we just needed permission
-        stream.getTracks().forEach(track => track.stop());
-        console.log("Camera permission granted successfully");
-        return true;
-      } catch (err: any) {
-        console.error("Camera permission error:", err);
-        if (err.name === "NotAllowedError") {
-          setError("Camera permission denied by user.");
-        } else if (err.name === "NotFoundError") {
-          setError("No camera device found on this device.");
-        } else {
-          setError("Camera permission denied or not available on this device.");
-        }
-        return false;
-      }
-    } catch (err) {
-      console.error("Error requesting camera permission:", err);
-      setError("Failed to request camera permission. Please try again.");
-      return false;
-    } finally {
-      setIsRequestingPermission(false);
-    }
-  };
-
   const handleViewAR = async () => {
     try {
-      // Request camera permission first
-      const permissionGranted = await requestCameraPermission();
-      
-      if (permissionGranted) {
-        // Wait a brief moment for permission to be fully processed
-        await new Promise(resolve => setTimeout(resolve, 300));
-        
-        // Check if model-viewer element is properly loaded
-        if (!viewerRef.current) {
-          setError("3D viewer not loaded. Please refresh and try again.");
-          return;
-        }
-        
-        const viewer = viewerRef.current as any;
-        
-        // Log debug info
-        console.log("AR Debug Info:", {
-          glbPath,
-          usdzPath,
-          deviceType,
-          isIOS: isIOS(),
-          viewerElement: !!viewer,
-          hasShadowRoot: !!viewer?.shadowRoot,
-        });
-        
-        // Try multiple approaches to trigger AR
-        let arTriggered = false;
-        
-        // Approach 1: Look for AR button in shadow DOM
-        const arButton = viewer?.shadowRoot?.querySelector('button[slot="ar-button"]') as HTMLButtonElement;
-        if (arButton) {
-          console.log("Found AR button, clicking it");
-          arButton.click();
-          arTriggered = true;
-        }
-        
-        // Approach 2: Try the activateAR() method if available
-        if (!arTriggered && typeof viewer?.activateAR === "function") {
-          console.log("Calling activateAR() method");
-          await viewer.activateAR();
-          arTriggered = true;
-        }
-        
-        // Approach 3: Try calling model-viewer's AR API directly
-        if (!arTriggered && viewer?.ar) {
-          console.log("Using model-viewer AR API");
-          if (typeof viewer.ar.launch === "function") {
-            viewer.ar.launch();
-            arTriggered = true;
-          }
-        }
-        
-        if (!arTriggered) {
-          // If nothing worked, provide detailed diagnostic message
-          const isIOS_Device = isIOS();
-          const hasModel = glbPath || usdzPath;
-          const browserInfo = navigator.userAgent;
-          
-          console.error("AR trigger failed", {
-            isIOS: isIOS_Device,
-            hasModel,
-            glbPath,
-            usdzPath,
-            browser: browserInfo,
-          });
-          
-          if (!hasModel) {
-            setError("No 3D model loaded. Please upload a model first.");
-          } else if (isIOS_Device) {
-            setError("iOS AR not supported in this browser. Try Safari or a device with ARKit support.");
-          } else {
-            setError("AR mode requires a device with WebXR or ARCore support. Try a mobile device with these features enabled.");
-          }
-        }
+      if (!viewerRef.current) {
+        setError("3D viewer not loaded. Please refresh and try again.");
+        return;
       }
+
+      const viewer = viewerRef.current as any;
+
+      // Try simple AR trigger approaches (shadow DOM button, activateAR, ar.launch)
+      const arButton = viewer?.shadowRoot?.querySelector('button[slot="ar-button"]') as HTMLButtonElement;
+      if (arButton) {
+        arButton.click();
+        return;
+      }
+
+      if (typeof viewer?.activateAR === "function") {
+        await viewer.activateAR();
+        return;
+      }
+
+      if (viewer?.ar && typeof viewer.ar.launch === "function") {
+        viewer.ar.launch();
+        return;
+      }
+
+      setError("AR mode is not available for this device or browser.");
     } catch (err) {
       console.error("Error entering AR mode:", err);
       setError("Failed to enter AR mode. Please try again.");
@@ -400,15 +280,7 @@ export function ModelViewerAR({
               >
                 <Maximize2 className="h-4 w-4" />
               </Button>
-              <Button
-                variant="outline"
-                size="icon"
-                onClick={() => setShowARHints(!showARHints)}
-                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
-                title={showARHints ? "Hide tips" : "Show tips"}
-              >
-                <Info className="h-4 w-4" />
-              </Button>
+              {/* Info / tips removed to restore previous UX state */}
             </div>
             
             {canViewAR() && (
@@ -416,41 +288,15 @@ export function ModelViewerAR({
                 className="min-h-12 px-6 gap-2 bg-primary hover:bg-primary/90 shadow-lg"
                 data-testid="button-view-ar"
                 onClick={handleViewAR}
-                disabled={isRequestingPermission}
               >
-                {isRequestingPermission ? (
-                  <>
-                    <RefreshCw className="h-5 w-5 animate-spin" />
-                    <span className="font-semibold">Requesting Access...</span>
-                  </>
-                ) : (
-                  <>
-                    <View className="h-5 w-5" />
-                    <span className="font-semibold">View in AR</span>
-                    <Smartphone className="h-4 w-4 ml-1" />
-                  </>
-                )}
+                <View className="h-5 w-5" />
+                <span className="font-semibold">View in AR</span>
+                <Smartphone className="h-4 w-4 ml-1" />
               </Button>
             )}
           </div>
 
-          {/* AR Tips/Hints Overlay */}
-          {showARHints && !error && (
-            <div className="mt-4 p-3 bg-black/80 rounded-lg backdrop-blur-sm border border-white/20 text-white text-sm animate-in fade-in">
-              <div className="space-y-2">
-                <div className="flex items-center gap-2 font-semibold">
-                  <Hand className="h-4 w-4 text-primary" />
-                  How to use:
-                </div>
-                <ul className="text-xs text-gray-300 space-y-1 pl-6 list-disc">
-                  <li><span className="text-primary font-medium">Drag</span> to rotate the model</li>
-                  <li><span className="text-primary font-medium">Pinch</span> to zoom in/out</li>
-                  <li><span className="text-primary font-medium">Tap</span> "View in AR" to place in your space</li>
-                  <li>Move your device to see the model from all angles</li>
-                </ul>
-              </div>
-            </div>
-          )}
+          {/* Tips overlay removed to restore previous UX state */}
         </div>
       </div>
       
@@ -461,24 +307,22 @@ export function ModelViewerAR({
             variant="ghost"
             size="sm"
             className="mt-2"
-            onClick={() => {
-              // If AR mode isn't available or camera permission is required,
-              // refresh the page to reset state and prompt the user to try again.
-              const msg = error || "";
-              if (msg.includes("AR mode is not available") || msg.includes("Camera permission")) {
-                try {
-                  window.location.reload();
-                } catch (e) {
-                  // fallback to resetting local state
-                  setError(null);
-                  setIsLoading(true);
+              onClick={() => {
+                // If AR mode isn't available, reload to reset state; otherwise clear error
+                const msg = error || "";
+                if (msg.includes("AR mode is not available")) {
+                  try {
+                    window.location.reload();
+                  } catch (e) {
+                    setError(null);
+                    setIsLoading(true);
+                  }
+                  return;
                 }
-                return;
-              }
 
-              setError(null);
-              setIsLoading(true);
-            }}
+                setError(null);
+                setIsLoading(true);
+              }}
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
@@ -548,7 +392,6 @@ export function ModelViewerAR({
               variant="outline"
               size="sm"
               onClick={handleViewAR}
-              disabled={isRequestingPermission}
               className="bg-primary hover:bg-primary/90 text-white border-0 backdrop-blur-sm"
               title="View this model in AR"
             >
