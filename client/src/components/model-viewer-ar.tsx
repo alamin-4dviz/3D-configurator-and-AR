@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { View, RotateCcw, Smartphone, RefreshCw, X, Maximize2, Lock, Unlock, Move, Minus, Plus } from "lucide-react";
+import { View, RotateCcw, Smartphone, RefreshCw, X, Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DeviceType } from "@shared/schema";
 
@@ -49,15 +49,10 @@ export function ModelViewerAR({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
-  const [scale, setScale] = useState(1);
-  const [offset, setOffset] = useState({ x: 0, y: 0 });
-  const [isDragging, setIsDragging] = useState(false);
-  const [dragMode, setDragMode] = useState(false);
-  const [positionLocked, setPositionLocked] = useState(false);
   const viewerRef = useRef<HTMLElement | null>(null);
   const fullscreenViewerRef = useRef<HTMLElement | null>(null);
-  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
 
+  // Ensure the model-viewer reacts to src changes (useful after uploads)
   useEffect(() => {
     const v = viewerRef.current as any;
     if (!v) return;
@@ -69,12 +64,14 @@ export function ModelViewerAR({
         setIsLoading(true);
         setError(null);
 
+        // If glbPath is falsy, clear the src
         if (!glbPath) {
           v.removeAttribute && v.removeAttribute("src");
           setIsLoading(false);
           return;
         }
 
+        // Set src directly to ensure the element picks up the new file
         try {
           v.setAttribute("src", glbPath);
         } catch (e) {
@@ -85,17 +82,19 @@ export function ModelViewerAR({
           }
         }
 
+        // Some model-viewer builds expose load()/reveal(); call them if present
         if (typeof v.load === "function") {
           await v.load();
         }
 
+        // small delay to allow internal processing
         await new Promise((r) => setTimeout(r, 120));
 
         if (typeof v.reveal === "function") {
           try {
             v.reveal();
           } catch (e) {
-            // ignore
+            // ignore reveal errors
           }
         }
 
@@ -128,13 +127,6 @@ export function ModelViewerAR({
     }
   };
 
-  const handleResetFullscreen = () => {
-    if (fullscreenViewerRef.current) {
-      (fullscreenViewerRef.current as any).cameraOrbit = "0deg 75deg 105%";
-      (fullscreenViewerRef.current as any).fieldOfView = "auto";
-    }
-  };
-
   const handleZoom = () => {
     setIsFullscreen(true);
   };
@@ -150,11 +142,6 @@ export function ModelViewerAR({
       if (source && target) {
         target.cameraOrbit = source.cameraOrbit;
         target.fieldOfView = source.fieldOfView;
-        try {
-          (fullscreenViewerRef.current as HTMLElement).style.transform = (viewerRef.current as HTMLElement).style.transform || "";
-        } catch (e) {
-          // ignore
-        }
       }
     }
   };
@@ -165,8 +152,17 @@ export function ModelViewerAR({
   };
 
   const canViewAR = () => {
-    if (glbPath) return true;
-    if (isIOS() && usdzPath) return true;
+    // If we have GLB, AR should generally be available
+    if (glbPath) {
+      return true;
+    }
+    
+    // If iOS and we have USDZ, AR is available
+    if (isIOS() && usdzPath) {
+      return true;
+    }
+    
+    // Fallback: if we have any path, allow AR (let model-viewer handle it)
     return Boolean(usdzPath);
   };
 
@@ -178,6 +174,8 @@ export function ModelViewerAR({
       }
 
       const viewer = viewerRef.current as any;
+
+      // Try simple AR trigger approaches (shadow DOM button, activateAR, ar.launch)
       const arButton = viewer?.shadowRoot?.querySelector('button[slot="ar-button"]') as HTMLButtonElement;
       if (arButton) {
         arButton.click();
@@ -201,41 +199,6 @@ export function ModelViewerAR({
     }
   };
 
-  // Apply CSS transforms to viewer elements
-  const applyTransforms = (el: HTMLElement | null, s: number, off: { x: number; y: number }) => {
-    if (!el) return;
-    el.style.transform = `translate(${off.x}px, ${off.y}px) scale(${s})`;
-  };
-
-  useEffect(() => {
-    applyTransforms(viewerRef.current as HTMLElement | null, scale, offset);
-    applyTransforms(fullscreenViewerRef.current as HTMLElement | null, scale, offset);
-  }, [scale, offset]);
-
-  // Pointer handlers (use any to avoid extra React import)
-  const onPointerDown = (e: any) => {
-    if (!dragMode || positionLocked) return;
-    setIsDragging(true);
-    dragStartRef.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
-    try {
-      (e.target as Element).setPointerCapture(e.pointerId);
-    } catch (_) {}
-  };
-
-  const onPointerMove = (e: any) => {
-    if (!isDragging || !dragStartRef.current) return;
-    const nx = e.clientX - dragStartRef.current.x;
-    const ny = e.clientY - dragStartRef.current.y;
-    setOffset({ x: nx, y: ny });
-  };
-
-  const onPointerUp = (e: any) => {
-    if (isDragging) {
-      setIsDragging(false);
-      dragStartRef.current = null;
-    }
-  };
-
   if (!glbPath && !usdzPath) {
     return (
       <div
@@ -251,20 +214,13 @@ export function ModelViewerAR({
 
   return (
     <div className={cn("w-full rounded-xl overflow-hidden shadow-lg", className)}>
-      <div
-        className="relative aspect-video bg-gradient-to-br from-card to-muted"
-        onPointerDown={onPointerDown}
-        onPointerMove={onPointerMove}
-        onPointerUp={onPointerUp}
-        onPointerCancel={onPointerUp}
-        onPointerLeave={onPointerUp}
-      >
+      <div className="relative aspect-video bg-gradient-to-br from-card to-muted">
         {isLoading && (
           <div className="absolute inset-0 flex items-center justify-center z-10">
             <Skeleton className="w-full h-full" />
           </div>
         )}
-
+        
         <model-viewer
           ref={viewerRef as any}
           src={glbPath || undefined}
@@ -279,21 +235,29 @@ export function ModelViewerAR({
           shadow-intensity="1"
           exposure="1"
           loading="eager"
-          style={{ width: "100%", height: "100%", backgroundColor: "transparent" }}
+          style={{
+            width: "100%",
+            height: "100%",
+            backgroundColor: "transparent",
+          }}
           onLoad={() => {
             setIsLoading(false);
             try {
               const v = viewerRef.current as any;
-              if (v && typeof v.reveal === "function") v.reveal();
-            } catch (e) {}
+              if (v && typeof v.reveal === "function") {
+                v.reveal();
+              }
+            } catch (e) {
+              // ignore reveal errors
+            }
           }}
           onError={() => {
             setIsLoading(false);
             setError("Failed to load model");
           }}
         />
-
-        <div className="absolute bottom-0 left-0 right-0 p-2 md:p-4 bg-gradient-to-t from-black/60 to-transparent">
+        
+        <div className="absolute bottom-0 left-0 right-0 p-4 bg-gradient-to-t from-black/60 to-transparent">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-2">
               <Button
@@ -306,7 +270,6 @@ export function ModelViewerAR({
               >
                 <RotateCcw className="h-4 w-4" />
               </Button>
-
               <Button
                 variant="outline"
                 size="icon"
@@ -317,57 +280,26 @@ export function ModelViewerAR({
               >
                 <Maximize2 className="h-4 w-4" />
               </Button>
-
-              <Button
-                variant={dragMode ? "default" : "outline"}
-                size="icon"
-                onClick={() => setDragMode(!dragMode)}
-                title={dragMode ? "Disable drag mode" : "Enable drag mode"}
-              >
-                <Move className="h-4 w-4" />
-              </Button>
-
-              <Button
-                variant={positionLocked ? "default" : "outline"}
-                size="icon"
-                onClick={() => setPositionLocked(!positionLocked)}
-                title={positionLocked ? "Unlock position" : "Lock position"}
-              >
-                {positionLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
-              </Button>
-
-              <div className="flex items-center gap-1 px-2">
-                <Minus className="h-4 w-4 text-muted-foreground" />
-                <input
-                  type="range"
-                  min="0.5"
-                  max="2"
-                  step="0.05"
-                  value={scale}
-                  onChange={(e) => setScale(Number(e.target.value))}
-                  className="w-28"
-                  aria-label="Scale model"
-                  title="Scale model"
-                />
-                <Plus className="h-4 w-4 text-muted-foreground" />
-              </div>
+              {/* Info / tips removed to restore previous UX state */}
             </div>
-
+            
             {canViewAR() && (
               <Button
-                className="px-4 gap-2 bg-primary hover:bg-primary/90 shadow-lg"
+                className="min-h-12 px-6 gap-2 bg-primary hover:bg-primary/90 shadow-lg"
                 data-testid="button-view-ar"
                 onClick={handleViewAR}
               >
-                <View className="h-4 w-4" />
-                <span className="font-semibold text-xs md:text-sm">View in AR</span>
+                <View className="h-5 w-5" />
+                <span className="font-semibold">View in AR</span>
                 <Smartphone className="h-4 w-4 ml-1" />
               </Button>
             )}
           </div>
+
+          {/* Tips overlay removed to restore previous UX state */}
         </div>
       </div>
-
+      
       {error && (
         <div className="p-4 bg-destructive/10 text-destructive text-center">
           <p className="text-sm">{error}</p>
@@ -375,21 +307,22 @@ export function ModelViewerAR({
             variant="ghost"
             size="sm"
             className="mt-2"
-            onClick={() => {
-              const msg = error || "";
-              if (msg.includes("AR mode is not available")) {
-                try {
-                  window.location.reload();
-                } catch (e) {
-                  setError(null);
-                  setIsLoading(true);
+              onClick={() => {
+                // If AR mode isn't available, reload to reset state; otherwise clear error
+                const msg = error || "";
+                if (msg.includes("AR mode is not available")) {
+                  try {
+                    window.location.reload();
+                  } catch (e) {
+                    setError(null);
+                    setIsLoading(true);
+                  }
+                  return;
                 }
-                return;
-              }
 
-              setError(null);
-              setIsLoading(true);
-            }}
+                setError(null);
+                setIsLoading(true);
+              }}
           >
             <RefreshCw className="h-4 w-4 mr-2" />
             Retry
@@ -399,8 +332,9 @@ export function ModelViewerAR({
 
       {isFullscreen && (
         <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          {/* Fullscreen Header */}
           <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between">
-            <div className="text-white max-w-[15rem] sm:max-w-sm">
+            <div className="text-white max-w-xs">
               <h3 className="font-semibold text-sm truncate">{title}</h3>
               <p className="text-xs text-gray-300">Fullscreen Preview</p>
             </div>
@@ -431,18 +365,23 @@ export function ModelViewerAR({
               shadow-intensity="1"
               exposure="1"
               loading="eager"
-              style={{ width: "100%", height: "100%", backgroundColor: "transparent" }}
+              style={{
+                width: "100%",
+                height: "100%",
+                backgroundColor: "transparent",
+              }}
               onLoad={() => {
                 syncFullscreenViewer();
               }}
             />
           </div>
 
+          {/* Fullscreen Controls Footer */}
           <div className="absolute bottom-0 left-0 right-0 z-10 p-4 bg-gradient-to-t from-black/80 to-transparent flex justify-center gap-3">
             <Button
               variant="outline"
               size="sm"
-              onClick={handleResetFullscreen}
+              onClick={handleReset}
               className="bg-white/20 hover:bg-white/30 text-white border-white/40 backdrop-blur-sm"
               title="Reset camera position"
             >
