@@ -228,7 +228,8 @@ export function ModelViewerAR({
           alt={title}
           ar
           ar-modes="webxr scene-viewer quick-look"
-          ar-scale="fixed"
+          ar-scale="auto"
+          ar-placement="floor"
           camera-controls
           touch-action="pan-y"
           auto-rotate
@@ -358,10 +359,10 @@ export function ModelViewerAR({
               alt={title}
               ar
               ar-modes="webxr scene-viewer quick-look"
-              ar-scale="fixed"
+              ar-scale="auto"
               camera-controls
               touch-action="pan-y"
-              auto-rotate
+              ar-placement="floor"
               shadow-intensity="1"
               exposure="1"
               loading="eager"
