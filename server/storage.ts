@@ -12,6 +12,8 @@ import {
 } from "@shared/schema";
 import { randomUUID } from "crypto";
 import bcrypt from "bcryptjs";
+import { promises as fs } from "fs";
+import { join } from "path";
 
 export interface IStorage {
   getUser(id: string): Promise<User | undefined>;
@@ -72,9 +74,56 @@ export class MemStorage implements IStorage {
       };
       this.users.set(adminUser.id, adminUser);
       console.log('Admin user initialized with password hash');
+      
+      // Load existing admin models from filesystem
+      await this.loadAdminModelsFromDisk();
     } catch (error) {
-      console.error('Error initializing admin user:', error);
+      console.error('Error during storage initialization:', error);
       throw error;
+    }
+  }
+
+  private async loadAdminModelsFromDisk(): Promise<void> {
+    try {
+      const adminModelsDir = join(process.cwd(), 'uploads', 'admin-models');
+      
+      // Check if directory exists
+      try {
+        await fs.access(adminModelsDir);
+      } catch {
+        // Directory doesn't exist yet, which is fine
+        return;
+      }
+      
+      const entries = await fs.readdir(adminModelsDir, { withFileTypes: true });
+      
+      for (const entry of entries) {
+        if (!entry.isDirectory()) continue;
+        
+        const modelDir = join(adminModelsDir, entry.name);
+        const metadataPath = join(modelDir, 'metadata.json');
+        
+        try {
+          const metadataContent = await fs.readFile(metadataPath, 'utf-8');
+          const model: AdminModel = JSON.parse(metadataContent);
+          
+          // Verify the model file still exists
+          if (model.glbPath) {
+            try {
+              await fs.access(join(process.cwd(), model.glbPath));
+              this.adminModels.set(model.id, model);
+              console.log(`Loaded admin model from disk: ${model.id} - ${model.title}`);
+            } catch {
+              console.warn(`Model file not found, skipping: ${model.id}`);
+            }
+          }
+        } catch (error) {
+          console.warn(`Failed to load metadata for ${entry.name}:`, error);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading admin models from disk:', error);
+      // Don't throw, just log the warning
     }
   }
 
@@ -136,7 +185,30 @@ export class MemStorage implements IStorage {
       updatedAt: now,
     };
     this.adminModels.set(id, model);
+    
+    // Save metadata to disk
+    await this.saveModelMetadataToDisk(model);
+    
     return model;
+  }
+
+  private async saveModelMetadataToDisk(model: AdminModel): Promise<void> {
+    try {
+      const adminModelsDir = join(process.cwd(), 'uploads', 'admin-models');
+      const modelDir = join(adminModelsDir, model.id);
+      
+      // Ensure directory exists
+      await fs.mkdir(modelDir, { recursive: true });
+      
+      // Write metadata.json
+      const metadataPath = join(modelDir, 'metadata.json');
+      await fs.writeFile(metadataPath, JSON.stringify(model, null, 2), 'utf-8');
+      
+      console.log(`Saved admin model metadata: ${model.id}`);
+    } catch (error) {
+      console.error(`Failed to save model metadata for ${model.id}:`, error);
+      // Don't throw, just log - the model is still in memory
+    }
   }
 
   async updateAdminModel(id: string, updates: Partial<InsertAdminModel>): Promise<AdminModel | undefined> {
@@ -155,6 +227,10 @@ export class MemStorage implements IStorage {
       updatedAt: new Date(),
     };
     this.adminModels.set(id, updatedModel);
+    
+    // Save updated metadata to disk
+    await this.saveModelMetadataToDisk(updatedModel);
+    
     return updatedModel;
   }
 

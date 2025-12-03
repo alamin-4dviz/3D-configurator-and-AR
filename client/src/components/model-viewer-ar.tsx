@@ -1,7 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Button } from "@/components/ui/button";
 import { Skeleton } from "@/components/ui/skeleton";
-import { View, RotateCcw, Smartphone, RefreshCw, X, Maximize2 } from "lucide-react";
+import { View, RotateCcw, Smartphone, RefreshCw, X, Maximize2, Lock, Unlock, Move, Minus, Plus } from "lucide-react";
 import { cn } from "@/lib/utils";
 import type { DeviceType } from "@shared/schema";
 
@@ -49,8 +49,511 @@ export function ModelViewerAR({
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [isFullscreen, setIsFullscreen] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragMode, setDragMode] = useState(false);
+  const [positionLocked, setPositionLocked] = useState(false);
   const viewerRef = useRef<HTMLElement | null>(null);
   const fullscreenViewerRef = useRef<HTMLElement | null>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
+
+  useEffect(() => {
+    const v = viewerRef.current as any;
+    if (!v) return;
+
+    let cancelled = false;
+
+    (async () => {
+      try {
+        setIsLoading(true);
+        setError(null);
+
+        if (!glbPath) {
+          v.removeAttribute && v.removeAttribute("src");
+          setIsLoading(false);
+          return;
+        }
+
+        try {
+          v.setAttribute("src", glbPath);
+        } catch (e) {
+          try {
+            v.src = glbPath;
+          } catch (err) {
+            // ignore
+          }
+        }
+
+        if (typeof v.load === "function") {
+          await v.load();
+        }
+
+        await new Promise((r) => setTimeout(r, 120));
+
+        if (typeof v.reveal === "function") {
+          try {
+            v.reveal();
+          } catch (e) {
+            // ignore
+          }
+        }
+
+        if (!cancelled) setIsLoading(false);
+      } catch (err) {
+        console.error("Error loading model viewer src:", err);
+        if (!cancelled) {
+          setIsLoading(false);
+          setError("Failed to load model");
+        }
+      }
+    })();
+
+    return () => {
+      cancelled = true;
+    };
+  }, [glbPath]);
+
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setIsLoading(false);
+    }, 1000);
+    return () => clearTimeout(timer);
+  }, [glbPath]);
+
+  const handleReset = () => {
+    if (viewerRef.current) {
+      (viewerRef.current as any).cameraOrbit = "0deg 75deg 105%";
+      (viewerRef.current as any).fieldOfView = "auto";
+    }
+  };
+
+  const handleResetFullscreen = () => {
+    if (fullscreenViewerRef.current) {
+      (fullscreenViewerRef.current as any).cameraOrbit = "0deg 75deg 105%";
+      (fullscreenViewerRef.current as any).fieldOfView = "auto";
+    }
+  };
+
+  const handleZoom = () => {
+    setIsFullscreen(true);
+  };
+
+  const handleCloseFullscreen = () => {
+    setIsFullscreen(false);
+  };
+
+  const syncFullscreenViewer = () => {
+    if (viewerRef.current && fullscreenViewerRef.current) {
+      const source = viewerRef.current as any;
+      const target = fullscreenViewerRef.current as any;
+      if (source && target) {
+        target.cameraOrbit = source.cameraOrbit;
+        target.fieldOfView = source.fieldOfView;
+        try {
+          (fullscreenViewerRef.current as HTMLElement).style.transform = (viewerRef.current as HTMLElement).style.transform || "";
+        } catch (e) {
+          // ignore
+        }
+      }
+    }
+  };
+
+  const isIOS = () => {
+    if (typeof window === "undefined") return false;
+    return /iPad|iPhone|iPod/.test(navigator.userAgent);
+  };
+
+  const canViewAR = () => {
+    if (glbPath) return true;
+    if (isIOS() && usdzPath) return true;
+    return Boolean(usdzPath);
+  };
+
+  const handleViewAR = async () => {
+    try {
+      if (!viewerRef.current) {
+        setError("3D viewer not loaded. Please refresh and try again.");
+        return;
+      }
+
+      const viewer = viewerRef.current as any;
+      const arButton = viewer?.shadowRoot?.querySelector('button[slot="ar-button"]') as HTMLButtonElement;
+      if (arButton) {
+        arButton.click();
+        return;
+      }
+
+      if (typeof viewer?.activateAR === "function") {
+        await viewer.activateAR();
+        return;
+      }
+
+      if (viewer?.ar && typeof viewer.ar.launch === "function") {
+        viewer.ar.launch();
+        return;
+      }
+
+      setError("AR mode is not available for this device or browser.");
+    } catch (err) {
+      console.error("Error entering AR mode:", err);
+      setError("Failed to enter AR mode. Please try again.");
+    }
+  };
+
+  // Apply CSS transforms to viewer elements
+  const applyTransforms = (el: HTMLElement | null, s: number, off: { x: number; y: number }) => {
+    if (!el) return;
+    el.style.transform = `translate(${off.x}px, ${off.y}px) scale(${s})`;
+  };
+
+  useEffect(() => {
+    applyTransforms(viewerRef.current as HTMLElement | null, scale, offset);
+    applyTransforms(fullscreenViewerRef.current as HTMLElement | null, scale, offset);
+  }, [scale, offset]);
+
+  // Pointer handlers (use any to avoid extra React import)
+  const onPointerDown = (e: any) => {
+    if (!dragMode || positionLocked) return;
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+    try {
+      (e.target as Element).setPointerCapture(e.pointerId);
+    } catch (_) {}
+  };
+
+  const onPointerMove = (e: any) => {
+    if (!isDragging || !dragStartRef.current) return;
+    const nx = e.clientX - dragStartRef.current.x;
+    const ny = e.clientY - dragStartRef.current.y;
+    setOffset({ x: nx, y: ny });
+  };
+
+  const onPointerUp = (e: any) => {
+    if (isDragging) {
+      setIsDragging(false);
+      dragStartRef.current = null;
+    }
+  };
+
+  if (!glbPath && !usdzPath) {
+    return (
+      <div
+        className={cn(
+          "w-full aspect-video rounded-xl bg-card border flex items-center justify-center",
+          className
+        )}
+      >
+        <p className="text-muted-foreground">No model available</p>
+      </div>
+    );
+  }
+
+  return (
+    <div className={cn("w-full rounded-xl overflow-hidden shadow-lg", className)}>
+      <div
+        className="relative aspect-video bg-gradient-to-br from-card to-muted"
+        onPointerDown={onPointerDown}
+        onPointerMove={onPointerMove}
+        onPointerUp={onPointerUp}
+        onPointerCancel={onPointerUp}
+        onPointerLeave={onPointerUp}
+      >
+        {isLoading && (
+          <div className="absolute inset-0 flex items-center justify-center z-10">
+            <Skeleton className="w-full h-full" />
+          </div>
+        )}
+
+        <model-viewer
+          ref={viewerRef as any}
+          src={glbPath || undefined}
+          ios-src={usdzPath || undefined}
+          alt={title}
+          ar
+          ar-modes="webxr scene-viewer quick-look"
+          ar-scale="fixed"
+          camera-controls
+          touch-action="pan-y"
+          auto-rotate
+          shadow-intensity="1"
+          exposure="1"
+          loading="eager"
+          style={{ width: "100%", height: "100%", backgroundColor: "transparent" }}
+          onLoad={() => {
+            setIsLoading(false);
+            try {
+              const v = viewerRef.current as any;
+              if (v && typeof v.reveal === "function") v.reveal();
+            } catch (e) {}
+          }}
+          onError={() => {
+            setIsLoading(false);
+            setError("Failed to load model");
+          }}
+        />
+
+        <div className="absolute bottom-0 left-0 right-0 p-2 md:p-4 bg-gradient-to-t from-black/60 to-transparent">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleReset}
+                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                title="Reset view to default camera position"
+                data-testid="button-reset-view"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleZoom}
+                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                title="Expand to fullscreen"
+                data-testid="button-zoom"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant={dragMode ? "default" : "outline"}
+                size="icon"
+                onClick={() => setDragMode(!dragMode)}
+                title={dragMode ? "Disable drag mode" : "Enable drag mode"}
+              >
+                <Move className="h-4 w-4" />
+              </Button>
+
+              <Button
+                variant={positionLocked ? "default" : "outline"}
+                size="icon"
+                onClick={() => setPositionLocked(!positionLocked)}
+                title={positionLocked ? "Unlock position" : "Lock position"}
+              >
+                {positionLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+              </Button>
+
+              <div className="flex items-center gap-1 px-2">
+                <Minus className="h-4 w-4 text-muted-foreground" />
+                <input
+                  type="range"
+                  min="0.5"
+                  max="2"
+                  step="0.05"
+                  value={scale}
+                  onChange={(e) => setScale(Number(e.target.value))}
+                  className="w-28"
+                  aria-label="Scale model"
+                  title="Scale model"
+                />
+                <Plus className="h-4 w-4 text-muted-foreground" />
+              </div>
+            </div>
+
+            {canViewAR() && (
+              <Button
+                className="px-4 gap-2 bg-primary hover:bg-primary/90 shadow-lg"
+                data-testid="button-view-ar"
+                onClick={handleViewAR}
+              >
+                <View className="h-4 w-4" />
+                <span className="font-semibold text-xs md:text-sm">View in AR</span>
+                <Smartphone className="h-4 w-4 ml-1" />
+              </Button>
+            )}
+          </div>
+        </div>
+      </div>
+
+      {error && (
+        <div className="p-4 bg-destructive/10 text-destructive text-center">
+          <p className="text-sm">{error}</p>
+          <Button
+            variant="ghost"
+            size="sm"
+            className="mt-2"
+            onClick={() => {
+              const msg = error || "";
+              if (msg.includes("AR mode is not available")) {
+                try {
+                  window.location.reload();
+                } catch (e) {
+                  setError(null);
+                  setIsLoading(true);
+                }
+                return;
+              }
+
+              setError(null);
+              setIsLoading(true);
+            }}
+          >
+            <RefreshCw className="h-4 w-4 mr-2" />
+            Retry
+          </Button>
+        </div>
+      )}
+
+      {isFullscreen && (
+        <div className="fixed inset-0 z-50 bg-black flex flex-col">
+          <div className="absolute top-0 left-0 right-0 z-10 p-4 bg-gradient-to-b from-black/60 to-transparent flex items-center justify-between">
+            <div className="text-white max-w-[15rem] sm:max-w-sm">
+              <h3 className="font-semibold text-sm truncate">{title}</h3>
+              <p className="text-xs text-gray-300">Fullscreen Preview</p>
+            </div>
+            <Button
+              onClick={handleCloseFullscreen}
+              variant="ghost"
+              size="icon"
+              className="bg-white hover:bg-gray-200 text-black rounded-full shadow-lg p-2"
+              data-testid="button-close-fullscreen"
+              title="Close fullscreen"
+            >
+              <X className="h-6 w-6" />
+            </Button>
+          </div>
+
+          <div className="w-full h-full flex-1 relative">
+            <model-viewer
+              ref={fullscreenViewerRef as any}
+              src={glbPath || undefined}
+              ios-src={usdzPath || undefined}
+              alt={title}
+              ar
+              ar-modes="webxr scene-viewer quick-look"
+              ar-scale="fixed"
+              camera-controls
+              touch-action="pan-y"
+              auto-rotate
+              shadow-intensity="1"
+              exposure="1"
+              loading="eager"
+              style={{ width: "100%", height: "100%", backgroundColor: "transparent" }}
+              onLoad={() => {
+                syncFullscreenViewer();
+              }}
+            />
+          </div>
+
+          <div className="absolute bottom-0 left-0 right-0 z-10 p-4 bg-gradient-to-t from-black/80 to-transparent flex justify-center gap-3">
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleResetFullscreen}
+              className="bg-white/20 hover:bg-white/30 text-white border-white/40 backdrop-blur-sm"
+              title="Reset camera position"
+            >
+              <RotateCcw className="h-4 w-4 mr-2" />
+              Reset
+            </Button>
+            <Button
+              variant="outline"
+              size="sm"
+              onClick={handleViewAR}
+              className="bg-primary hover:bg-primary/90 text-white border-0 backdrop-blur-sm"
+              title="View this model in AR"
+            >
+              <View className="h-4 w-4 mr-2" />
+              View in AR
+            </Button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+import { View, RotateCcw, Smartphone, RefreshCw, X, Maximize2, Lock, Unlock, Move, Minus, Plus } from "lucide-react";
+import { cn } from "@/lib/utils";
+import type { DeviceType } from "@shared/schema";
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleReset}
+                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                title="Reset view to default camera position"
+                data-testid="button-reset-view"
+              >
+                <RotateCcw className="h-4 w-4" />
+              </Button>
+              <Button
+                variant="outline"
+                size="icon"
+                onClick={handleZoom}
+                className="bg-background/80 backdrop-blur-sm hover:bg-background/90"
+                title="Expand to fullscreen"
+                data-testid="button-zoom"
+              >
+                <Maximize2 className="h-4 w-4" />
+              </Button>
+              {/* Scale / Drag / Lock controls */}
+              <div className="flex items-center gap-2">
+                <Button
+                  variant={dragMode ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setDragMode(!dragMode)}
+                  title={dragMode ? "Disable drag mode" : "Enable drag mode"}
+                >
+                  <Move className="h-4 w-4" />
+                </Button>
+                <Button
+                  variant={positionLocked ? "default" : "outline"}
+                  size="icon"
+                  onClick={() => setPositionLocked(!positionLocked)}
+                  title={positionLocked ? "Unlock position" : "Lock position"}
+                >
+                  {positionLocked ? <Lock className="h-4 w-4" /> : <Unlock className="h-4 w-4" />}
+                </Button>
+                <div className="flex items-center gap-1 px-2">
+                  <Minus className="h-4 w-4 text-muted-foreground" />
+                  <input
+                    type="range"
+                    min="0.5"
+                    max="2"
+                    step="0.05"
+                    value={scale}
+                    onChange={(e) => setScale(Number(e.target.value))}
+                    className="w-28"
+                    aria-label="Scale model"
+                    title="Scale model"
+                  />
+                  <Plus className="h-4 w-4 text-muted-foreground" />
+                </div>
+              </div>
+        HTMLElement
+      >;
+    }
+  }
+}
+
+interface ModelViewerARProps {
+  glbPath?: string | null;
+  usdzPath?: string | null;
+  deviceType: DeviceType;
+  title?: string;
+  className?: string;
+}
+
+export function ModelViewerAR({
+  glbPath,
+  usdzPath,
+  deviceType,
+  title = "3D Model",
+  className,
+}: ModelViewerARProps) {
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [isFullscreen, setIsFullscreen] = useState(false);
+  const [scale, setScale] = useState(1);
+  const [offset, setOffset] = useState({ x: 0, y: 0 });
+  const [isDragging, setIsDragging] = useState(false);
+  const [dragMode, setDragMode] = useState(false);
+  const [positionLocked, setPositionLocked] = useState(false);
+  const viewerRef = useRef<HTMLElement | null>(null);
+  const fullscreenViewerRef = useRef<HTMLElement | null>(null);
+  const dragStartRef = useRef<{ x: number; y: number } | null>(null);
 
   // Ensure the model-viewer reacts to src changes (useful after uploads)
   useEffect(() => {
@@ -149,6 +652,12 @@ export function ModelViewerAR({
       if (source && target) {
         target.cameraOrbit = source.cameraOrbit;
         target.fieldOfView = source.fieldOfView;
+        // sync CSS transform (scale + translate) if applied
+        try {
+          (fullscreenViewerRef.current as HTMLElement).style.transform = (viewerRef.current as HTMLElement).style.transform || "";
+        } catch (e) {
+          // ignore
+        }
       }
     }
   };
@@ -203,6 +712,39 @@ export function ModelViewerAR({
     } catch (err) {
       console.error("Error entering AR mode:", err);
       setError("Failed to enter AR mode. Please try again.");
+    }
+  };
+
+  // Apply visual transform (translate + scale) to viewer elements
+  const applyTransforms = (el: HTMLElement | null, s: number, off: { x: number; y: number }) => {
+    if (!el) return;
+    el.style.transform = `translate(${off.x}px, ${off.y}px) scale(${s})`;
+  };
+
+  useEffect(() => {
+    applyTransforms(viewerRef.current as HTMLElement | null, scale, offset);
+    applyTransforms(fullscreenViewerRef.current as HTMLElement | null, scale, offset);
+  }, [scale, offset]);
+
+  // Pointer handlers for drag mode
+  const onPointerDown = (e: React.PointerEvent) => {
+    if (!dragMode || positionLocked) return;
+    setIsDragging(true);
+    dragStartRef.current = { x: e.clientX - offset.x, y: e.clientY - offset.y };
+    (e.target as Element).setPointerCapture(e.pointerId);
+  };
+
+  const onPointerMove = (e: React.PointerEvent) => {
+    if (!isDragging || !dragStartRef.current) return;
+    const nx = e.clientX - dragStartRef.current.x;
+    const ny = e.clientY - dragStartRef.current.y;
+    setOffset({ x: nx, y: ny });
+  };
+
+  const onPointerUp = (e: React.PointerEvent) => {
+    if (isDragging) {
+      setIsDragging(false);
+      dragStartRef.current = null;
     }
   };
 
@@ -290,7 +832,7 @@ export function ModelViewerAR({
               {/* Info / tips removed to restore previous UX state */}
             </div>
             
-            {canViewAR() && (
+              {canViewAR() && (
               <Button
                 className="px-4 gap-2 bg-primary hover:bg-primary/90 shadow-lg"
                 data-testid="button-view-ar"
