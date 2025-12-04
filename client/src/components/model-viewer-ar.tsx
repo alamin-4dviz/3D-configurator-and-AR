@@ -232,7 +232,6 @@ export function ModelViewerAR({
           ar-placement="floor"
           camera-controls
           touch-action="pan-y"
-          auto-rotate
           shadow-intensity="1"
           exposure="1"
           loading="eager"
